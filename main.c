@@ -16,6 +16,8 @@ LICENSE file in the root directory of this source tree.
 #include <errno.h>
 #include <ctype.h>
 #include <dlfcn.h>
+#include <sys/types.h>
+#include <pwd.h>
 #include <time.h>
 #include "parson.h"
 #include "mybmm.h"
@@ -98,7 +100,8 @@ void get_temps(mybmm_pack_t *pp, JSON_Array *array) {
 		value = json_array_get_value(array, i);
 		f = json_value_get_number(value);
 		dprintf(1,"i: %d, f: %f\n", i, f);
-		pp->temps[i] = f;
+#define FTEMP(v) ( ( ( (float)(v) * 9.0 ) / 5.0) + 32.0)
+		pp->temps[i] = FTEMP(f);
 	}
 	pp->ntemps = count;
 }
@@ -312,6 +315,16 @@ int mycb(void *ctx, char *topicName, int topicLen, MQTTClient_message *message) 
 
 char *find_config_file(char *name) {
 	static char temp[1024];
+	long uid;
+	struct passwd *pw;
+
+	uid = getuid();
+	pw = getpwuid(uid);
+	if (pw) {
+		sprintf(temp,"%s/etc/%s",pw->pw_dir,name);
+		dprintf(1,"temp: %s\n", temp);
+		if (access(temp,R_OK)==0) return temp;
+	}
 
 	if (access(name,R_OK)==0) return name;
 	sprintf(temp,"/etc/%s",name);
