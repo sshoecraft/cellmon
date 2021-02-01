@@ -248,13 +248,13 @@ void add_or_update_pack(mybmm_config_t *conf, char *name, char *payload) {
 		case JSONNumber:
 			num = json_value_get_number(value);
 			dprintf(1,"num: %f\n", num);
-			if (strcmp(label,"Voltage")==0)
+			if (strcasecmp(label,"Voltage")==0)
 				pp->voltage = num;
-			else if (strcmp(label,"Current")==0)
+			else if (strcasecmp(label,"Current")==0)
 				pp->current = num;
-			else if (strcmp(label,"Capacity")==0)
+			else if (strcasecmp(label,"Capacity")==0)
 				pp->capacity = num;
-			else if (strcmp(label,"Status")==0)
+			else if (strcasecmp(label,"Status")==0)
 				pp->status = num;
 			break;
 		case JSONArray:
@@ -318,6 +318,7 @@ char *find_config_file(char *name) {
 	long uid;
 	struct passwd *pw;
 
+	if (access(name,R_OK)==0) return name;
 	uid = getuid();
 	pw = getpwuid(uid);
 	if (pw) {
@@ -326,7 +327,6 @@ char *find_config_file(char *name) {
 		if (access(temp,R_OK)==0) return temp;
 	}
 
-	if (access(name,R_OK)==0) return name;
 	sprintf(temp,"/etc/%s",name);
 	if (access(temp,R_OK)==0) return temp;
 	sprintf(temp,"/usr/local/etc/%s",name);
@@ -419,7 +419,7 @@ int main(int argc, char **argv) {
 		sprintf(topic,"%s/#",conf->mqtt_topic);
 		m = mqtt_new(conf->mqtt_broker,"Cellmon",topic);
 		if (mqtt_setcb(m,conf,0,mycb,0)) return 1;
-		if (mqtt_connect(m,interval/2)) return 1;
+		if (mqtt_connect(m,interval/2,conf->mqtt_username,conf->mqtt_password)) return 1;
 		if (mqtt_sub(m,topic)) return 1;
 	}
 
