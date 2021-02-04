@@ -25,7 +25,7 @@ LICENSE file in the root directory of this source tree.
 #include "mqtt.h"
 
 /* Default refresh rate */
-#define DEFAULT_INTERVAL 30
+#define DEFAULT_INTERVAL 3
 
 #ifndef TRUE
 #define TRUE 1
@@ -283,6 +283,7 @@ void add_or_update_pack(mybmm_config_t *conf, char *name, char *payload) {
 		list_sort(conf->packs,_namesort,0);
 	}
 //	dprintf(1,"returning...\n");
+	conf->state = 1;
 }
 
 int mycb(void *ctx, char *topicName, int topicLen, MQTTClient_message *message) {
@@ -337,17 +338,18 @@ char *find_config_file(char *name) {
 }
 
 int main(int argc, char **argv) {
-	int opt,interval;
+	int opt;
+//	int interval;
 	char type[MYBMM_MODULE_NAME_LEN+1],transport[MYBMM_MODULE_NAME_LEN+1],target[MYBMM_TARGET_LEN+1],*opts;
 	mybmm_config_t *conf;
-	mybmm_pack_t *pp;
+//	mybmm_pack_t *pp;
 	worker_pool_t *pool;
-	time_t start,end,diff;
+//	time_t start,end,diff;
 	mqtt_session_t *m;
 
 	opts = 0;
 	type[0] = transport[0] = target[0] = 0;
-	interval = DEFAULT_INTERVAL;
+//	interval = DEFAULT_INTERVAL;
 	while ((opt=getopt(argc, argv, "d:p:e:i:h")) != -1) {
 		switch (opt) {
 		case 'd':
@@ -366,9 +368,11 @@ int main(int argc, char **argv) {
 		case 'e':
 			opts = optarg;
 			break;
+#if 0
 		case 'i':
 			interval = atoi(optarg);
 			break;
+#endif
 		case 'h':
 		default:
 			usage(argv[0]);
@@ -419,7 +423,7 @@ int main(int argc, char **argv) {
 		sprintf(topic,"%s/#",conf->mqtt_topic);
 		m = mqtt_new(conf->mqtt_broker,"Cellmon",topic);
 		if (mqtt_setcb(m,conf,0,mycb,0)) return 1;
-		if (mqtt_connect(m,interval/2,conf->mqtt_username,conf->mqtt_password)) return 1;
+		if (mqtt_connect(m,20,conf->mqtt_username,conf->mqtt_password)) return 1;
 		if (mqtt_sub(m,topic)) return 1;
 	}
 
@@ -429,6 +433,7 @@ int main(int argc, char **argv) {
 
 	/* main loop */
 	while(1) {
+#if 0
 		time(&start);
 		dprintf(1,"updating...\n");
 		list_reset(conf->packs);
@@ -443,10 +448,13 @@ int main(int argc, char **argv) {
 		worker_wait(pool,interval);
 		worker_killbusy(pool);
 		time(&end);
+#endif
 		display(conf);
-		diff = end - start;
-		dprintf(1,"interval: %d, diff: %d\n", interval, (int)diff);
-		if (diff < interval) sleep(interval - diff);
+//		diff = end - start;
+		conf->state = 0;
+		while(!conf->state) sleep(1);
+//		dprintf(1,"interval: %d, diff: %d\n", interval, (int)diff);
+//		if (diff < interval) sleep(interval - diff);
 	}
 
 	worker_destroy_pool(pool,-1);
