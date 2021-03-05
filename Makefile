@@ -42,11 +42,11 @@ debug: $(PROG)
 
 include $(MYBMM_SRC)/Makefile.dep
 
-BINDIR=$(shell if "$$(id -u)" = "0"; then echo "-o bin -g bin /usr/local/bin/"; else echo ~/bin/; fi)
-ETCDIR=$(shell if "$$(id -u)" = "0"; then echo /usr/local/etc/; else echo ~/etc/; fi)
+#BINDIR=$(shell if "$$(id -u)" = "0"; then echo "-o bin -g bin /usr/local/bin/"; else echo ~/bin/; fi)
+#ETCDIR=$(shell if "$$(id -u)" = "0"; then echo /usr/local/etc/; else echo ~/etc/; fi)
 
 install: $(PROG)
-	install -m 755 -o bin -g bin $(PROG) /usr/bin/$(PROG)
+	sudo install -m 755 -o bin -g bin $(PROG) /usr/local/bin/$(PROG)
 
 clean:
 	rm -rf $(PROG) $(OBJS) $(CLEANFILES)

@@ -1,7 +1,30 @@
 
+#include <time.h>
 #include "mybmm.h"
 
-#define COLUMN_WIDTH 5
+#define COLUMN_WIDTH 7
+
+static char *gettd(time_t start, time_t end) {
+	static char ts[32];
+	int diff,mins;
+
+	diff = (int)difftime(end,start);
+	dprintf(1,"start: %ld, end: %ld, diff: %d\n", start, end, diff);
+	if (diff > 0) {
+		mins = diff / 60;
+		if (mins) diff -= (mins * 60);
+		dprintf(1,"mins: %d, diff: %d\n", mins, diff);
+	} else {
+		mins = diff = 0;
+	}
+	if (mins >= 5) {
+		sprintf(ts,"--:--");
+	} else {
+		sprintf(ts,"%02d:%02d",mins,diff);
+	}
+	dprintf(1,"ts: %s\n", ts);
+	return ts;
+}
 
 void display(struct mybmm_config *conf) {
 #if 0
@@ -14,16 +37,18 @@ void display(struct mybmm_config *conf) {
 	float values[MYBMM_PACK_MAX_CELLS][MYBMM_MAX_PACKS];
 	float summ[NSUMM][MYBMM_MAX_PACKS];
 	float bsum[NBSUM][MYBMM_MAX_PACKS];
+	char lupd[MYBMM_MAX_PACKS][32];
 #endif
 	float cell_total, cell_min, cell_max, cell_diff, cell_avg, min_cap;
 	int x,y,npacks,cells,max_temps,pack_reported;
 	char str[32],*p;
 	char *slabels[NSUMM] = { "Min","Max","Avg","Diff" };
-	char *tlabels[NBSUM] = { "Curr","Volt" };
+	char *tlabels[NBSUM] = { "Current","Voltage" };
 	mybmm_inverter_t *inv;
 	mybmm_pack_t *pp;
 	char format[16];
 	uint8_t cdbstat[MYBMM_MAX_PACKS];
+	time_t curr_time;
 
 	npacks = list_count(conf->packs);
 
@@ -109,6 +134,8 @@ void display(struct mybmm_config *conf) {
 		summ[3][x] = cell_diff;
 		bsum[0][x] = pp->current;
 		bsum[1][x] = cell_total;
+		time(&curr_time);
+		strcpy(lupd[x],gettd(pp->last_update,curr_time));
 #endif
 		x++;
 	}
@@ -170,7 +197,7 @@ void display(struct mybmm_config *conf) {
 	printf("\n");
 
 	/* Charge/Discharge/Balance */
-	printf(format,"CBD");
+	printf(format,"CDB");
 	list_reset(conf->packs);
 	while((pp = list_get_next(conf->packs)) != 0) {
 		if (mybmm_check_state(pp,MYBMM_PACK_STATE_UPDATED)) {
@@ -251,6 +278,12 @@ void display(struct mybmm_config *conf) {
 		}
 		printf("\n");
 	}
+
+	/* Last update */
+	printf("\n");
+	printf(format,"updated");
+	for(x=0; x < npacks; x++) printf(format,lupd[x]);
+	printf("\n");
 
 #if 0
 	free(temps);

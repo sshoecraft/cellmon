@@ -25,7 +25,7 @@ LICENSE file in the root directory of this source tree.
 #include "mqtt.h"
 
 /* Default refresh rate */
-#define DEFAULT_INTERVAL 3
+#define DEFAULT_INTERVAL 1
 
 #ifndef TRUE
 #define TRUE 1
@@ -47,17 +47,6 @@ int init_pack(mybmm_pack_t *pp, mybmm_config_t *c, char *type, char *transport, 
         pp->handle = cp->new(c,pp,tp);
 	list_add(c->packs,pp,sizeof(*pp));
         return 0;
-}
-
-void usage(char *name) {
-	printf("usage: %s [-acjJrwlh] [-f filename] [-b <bluetooth mac addr | -i <ip addr>] [-o output file]\n",name);
-	printf("arguments:\n");
-#ifdef DEBUG
-	printf("  -d <#>		debug output\n");
-#endif
-	printf("  -h		this output\n");
-	printf("  -t <transport:target> transport & target\n");
-	printf("  -e <opts>	transport-specific opts\n");
 }
 
 mybmm_pack_t *find_pack_by_uuid(mybmm_config_t *conf, char *uuid) {
@@ -276,6 +265,7 @@ void add_or_update_pack(mybmm_config_t *conf, char *name, char *payload) {
 		}
 	}
 	mybmm_set_state(pp,MYBMM_PACK_STATE_UPDATED);
+	time(&pp->last_update);
 //	dprintf(1,"isnew: %d\n", isnew);
 	if (isnew) {
 //		dump_pack(pp);
@@ -337,6 +327,16 @@ char *find_config_file(char *name) {
 	return 0;
 }
 
+void usage(char *name) {
+	printf("usage: %s [-acjJrwlh] [-f filename] [-b <bluetooth mac addr | -i <ip addr>] [-o output file]\n",name);
+	printf("arguments:\n");
+#ifdef DEBUG
+	printf("  -d <#>	debug output\n");
+#endif
+//	printf("  -i <#>	refresh interval\n");
+	printf("  -h		this output\n");
+}
+
 int main(int argc, char **argv) {
 	int opt;
 //	int interval;
@@ -350,23 +350,10 @@ int main(int argc, char **argv) {
 	opts = 0;
 	type[0] = transport[0] = target[0] = 0;
 //	interval = DEFAULT_INTERVAL;
-	while ((opt=getopt(argc, argv, "d:p:e:i:h")) != -1) {
+	while ((opt=getopt(argc, argv, "d:i:h")) != -1) {
 		switch (opt) {
 		case 'd':
 			debug=atoi(optarg);
-			break;
-                case 'p':
-			strncpy(type,strele(0,":",optarg),sizeof(type)-1);
-			strncpy(transport,strele(1,":",optarg),sizeof(transport)-1);
-			strncpy(target,strele(2,":",optarg),sizeof(target)-1);
-			if (!strlen(type) || !strlen(transport) || !strlen(target)) {
-				printf("error: format is type:transport:target\n");
-				usage(argv[0]);
-				return 1;
-			}
-			break;
-		case 'e':
-			opts = optarg;
 			break;
 #if 0
 		case 'i':
@@ -425,6 +412,7 @@ int main(int argc, char **argv) {
 		if (mqtt_setcb(m,conf,0,mycb,0)) return 1;
 		if (mqtt_connect(m,20,conf->mqtt_username,conf->mqtt_password)) return 1;
 		if (mqtt_sub(m,topic)) return 1;
+		if (mqtt_sub(m,"/SolarD/Battery/#")) return 1;
 	}
 
 	pool = worker_create_pool(list_count(conf->packs));
@@ -451,10 +439,11 @@ int main(int argc, char **argv) {
 #endif
 		display(conf);
 //		diff = end - start;
-		conf->state = 0;
-		while(!conf->state) sleep(1);
+//		conf->state = 0;
+//		while(!conf->state) sleep(1);
 //		dprintf(1,"interval: %d, diff: %d\n", interval, (int)diff);
 //		if (diff < interval) sleep(interval - diff);
+		sleep(1);
 	}
 
 	worker_destroy_pool(pool,-1);
