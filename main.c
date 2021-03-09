@@ -278,7 +278,7 @@ void add_or_update_pack(mybmm_config_t *conf, char *name, char *payload) {
 
 int mycb(void *ctx, char *topicName, int topicLen, MQTTClient_message *message) {
 	int len;
-	char topic[128],payload[1024],*p;
+	char topic[128],payload[1024],name[32];
 
 	dprintf(1,"ctx: %p, topicName: %p, topicLen: %d, message: %p\n", ctx, topicName, topicLen, message);
 	if (topicLen) {
@@ -293,11 +293,12 @@ int mycb(void *ctx, char *topicName, int topicLen, MQTTClient_message *message) 
 	len = message->payloadlen > sizeof(payload)-1 ? sizeof(payload)-1 : message->payloadlen;
 	memcpy(payload,message->payload,len);
         payload[len] = 0;
-//	dprintf(1,"payload: %s\n", payload);
-	p = strrchr(topic,'/');
-	if (!p) p = topic;
-	else p++;
-	add_or_update_pack(ctx,p,payload);
+	dprintf(5,"payload: %s\n", payload);
+	/* /SolarD/Battery/<name>/Data */
+	name[0] = 0;
+	strncat(name,strele(3,"/",topic),sizeof(name)-1);
+	dprintf(1,"name: %s\n", name);
+	add_or_update_pack(ctx,name,payload);
 	MQTTClient_freeMessage(&message);
 	MQTTClient_free(topic);
 	dprintf(1,"returning...\n");
@@ -333,33 +334,22 @@ void usage(char *name) {
 #ifdef DEBUG
 	printf("  -d <#>	debug output\n");
 #endif
-//	printf("  -i <#>	refresh interval\n");
 	printf("  -h		this output\n");
 }
 
 int main(int argc, char **argv) {
 	int opt;
-//	int interval;
 	char type[MYBMM_MODULE_NAME_LEN+1],transport[MYBMM_MODULE_NAME_LEN+1],target[MYBMM_TARGET_LEN+1],*opts;
 	mybmm_config_t *conf;
-//	mybmm_pack_t *pp;
-	worker_pool_t *pool;
-//	time_t start,end,diff;
 	mqtt_session_t *m;
 
 	opts = 0;
 	type[0] = transport[0] = target[0] = 0;
-//	interval = DEFAULT_INTERVAL;
 	while ((opt=getopt(argc, argv, "d:i:h")) != -1) {
 		switch (opt) {
 		case 'd':
 			debug=atoi(optarg);
 			break;
-#if 0
-		case 'i':
-			interval = atoi(optarg);
-			break;
-#endif
 		case 'h':
 		default:
 			usage(argv[0]);
@@ -412,41 +402,20 @@ int main(int argc, char **argv) {
 		if (mqtt_setcb(m,conf,0,mycb,0)) return 1;
 		if (mqtt_connect(m,20,conf->mqtt_username,conf->mqtt_password)) return 1;
 		if (mqtt_sub(m,topic)) return 1;
-		if (mqtt_sub(m,"/SolarD/Battery/#")) return 1;
+		if (mqtt_sub(m,"/SolarD/Battery/+/Data")) return 1;
 	}
-
-	pool = worker_create_pool(list_count(conf->packs));
-
-	conf->cell_crit_high = 9.9;
 
 	/* main loop */
+	conf->cell_crit_high = 9.9;
 	while(1) {
-#if 0
-		time(&start);
-		dprintf(1,"updating...\n");
-		list_reset(conf->packs);
-		while((pp = list_get_next(conf->packs)) != 0) {
-			if (strlen(pp->type)) {
-				mybmm_clear_state(pp,MYBMM_PACK_STATE_UPDATED);
-				worker_exec(pool,(worker_func_t)pack_update,pp);
-			} else {
-				mybmm_set_state(pp,MYBMM_PACK_STATE_UPDATED);
-			}
-		}
-		worker_wait(pool,interval);
-		worker_killbusy(pool);
-		time(&end);
-#endif
 		display(conf);
-//		diff = end - start;
-//		conf->state = 0;
-//		while(!conf->state) sleep(1);
-//		dprintf(1,"interval: %d, diff: %d\n", interval, (int)diff);
-//		if (diff < interval) sleep(interval - diff);
-		sleep(1);
+		if (debug) {
+			conf->state = 0;
+			while(!conf->state) sleep(1);
+		} else {
+			sleep(1);
+		}
 	}
-
-	worker_destroy_pool(pool,-1);
 
 	return 0;
 }
